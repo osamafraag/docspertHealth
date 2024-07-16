@@ -7,6 +7,7 @@ import csv
 import io
 from .serializers import AccountSerializer, TransferFundsSerializer
 
+
 class AccountListView(APIView):
     def get(self, request):
         accounts = Account.objects.all()
