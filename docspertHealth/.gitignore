@@ -1,0 +1,18 @@
+# SQLite databases
+*.sqlite3
+*.db
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Migration files
+*/migrations/*.py
+*/migrations/__pycache__/
+
+# Environment files
+.env
+
+# Other files
+*.log
+*.tmp
