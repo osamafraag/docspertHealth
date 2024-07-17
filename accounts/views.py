@@ -3,16 +3,36 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Account
+from django.core.paginator import Paginator
 import csv
 import io
+from django.db.models import Q
 from .serializers import AccountSerializer, TransferFundsSerializer
 
 
 class AccountListView(APIView):
     def get(self, request):
-        accounts = Account.objects.all()
-        serializer = AccountSerializer(accounts, many=True)
-        return Response(serializer.data)
+        searchQuery = request.GET.get('search')
+        if searchQuery:
+            accounts = Account.objects.filter(
+                Q(accountId__icontains=searchQuery) | 
+                Q(name__icontains=searchQuery)
+            )
+        else:
+            accounts = Account.objects.all()
+        paginator = Paginator(accounts, 10)
+        page = request.GET.get('page', 1)
+        pageData = paginator.get_page(page)
+        serializer =  AccountSerializer(pageData, many=True) 
+        return Response({
+            'data': serializer.data,
+            'meta': {
+                'page': pageData.number,
+                'perPage': 10,
+                'totalPages': paginator.num_pages,
+                'totalItems': paginator.count
+            }
+        })
 
     def post(self, request):
         serializer = AccountSerializer(data=request.data)
