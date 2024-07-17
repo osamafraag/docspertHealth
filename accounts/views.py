@@ -2,12 +2,12 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Account
+from .models import Account, TransactionHistory
 from django.core.paginator import Paginator
 import csv
 import io
 from django.db.models import Q
-from .serializers import AccountSerializer, TransferFundsSerializer
+from .serializers import AccountSerializer, TransferFundsSerializer, TransactionHistorySerializer
 
 
 class AccountListView(APIView):
@@ -46,7 +46,16 @@ class AccountDetailView(APIView):
         account =Account.getObject(accountId)
         if account is not None:
             serializer = AccountSerializer(account)
-            return Response(serializer.data)
+            data = serializer.data
+            fromHistory = TransactionHistory.objects.filter(fromAccount=account)
+            toHistory = TransactionHistory.objects.filter(toAccount=account)
+            
+            fromSerializer = TransactionHistorySerializer(fromHistory, many=True)
+            toSerializer = TransactionHistorySerializer(toHistory, many=True)
+            
+            data['fromHistory'] = fromSerializer.data
+            data['toHistory'] = toSerializer.data
+            return Response(data)
         return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def put(self, request, accountId):
@@ -80,6 +89,12 @@ class TransferFundsView(APIView):
                 if fromAccount.getBalance() >= amount:
                     fromAccount.updateBalance(amount)  
                     toAccount.updateBalance(amount, isDebit=False) 
+                    transactionHistory = TransactionHistory(
+                        fromAccount=fromAccount,
+                        toAccount=toAccount,
+                        amount=amount
+                    )
+                    transactionHistory.save()
                     return Response({"message": "Transfer successful"}, status=status.HTTP_200_OK)
                 else:
                     return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)

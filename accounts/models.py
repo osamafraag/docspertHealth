@@ -29,3 +29,12 @@ class Account(models.Model):
         
     def __str__(self):
         return f"{self.name} ({self.accountId})"
+
+class TransactionHistory(models.Model):
+    fromAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='from_account')
+    toAccount = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='to_account')
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
+    date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Transaction from {self.fromAccount} to {self.toAccount} for {self.amount} on {self.date}"

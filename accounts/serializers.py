@@ -1,9 +1,14 @@
 from rest_framework import serializers
-from .models import Account
+from .models import Account, TransactionHistory
 
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
+        fields = '__all__'  
+        
+class TransactionHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TransactionHistory
         fields = '__all__'  
         
 class TransferFundsSerializer(serializers.Serializer):
