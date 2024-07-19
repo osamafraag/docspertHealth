@@ -13,6 +13,7 @@ from .serializers import AccountSerializer, TransferFundsSerializer, Transaction
 class AccountListView(APIView):
     def get(self, request):
         searchQuery = request.GET.get('search')
+        page = request.GET.get('page')
         if searchQuery:
             accounts = Account.objects.filter(
                 Q(accountId__icontains=searchQuery) | 
@@ -20,19 +21,21 @@ class AccountListView(APIView):
             )
         else:
             accounts = Account.objects.all()
-        paginator = Paginator(accounts, 10)
-        page = request.GET.get('page', 1)
-        pageData = paginator.get_page(page)
-        serializer =  AccountSerializer(pageData, many=True) 
-        return Response({
-            'data': serializer.data,
-            'meta': {
-                'page': pageData.number,
-                'perPage': 10,
-                'totalPages': paginator.num_pages,
-                'totalItems': paginator.count
-            }
-        })
+        if page :
+            paginator = Paginator(accounts, 10)
+            pageData = paginator.get_page(page)
+            serializer =  AccountSerializer(pageData, many=True) 
+            return Response({
+                'data': serializer.data,
+                'meta': {
+                    'page': pageData.number,
+                    'perPage': 10,
+                    'totalPages': paginator.num_pages,
+                    'totalItems': paginator.count
+                }
+            })
+        serializer =  AccountSerializer(accounts, many=True) 
+        return Response({'data': serializer.data, 'meta': False})
 
     def post(self, request):
         serializer = AccountSerializer(data=request.data)
@@ -56,16 +59,6 @@ class AccountDetailView(APIView):
             data['fromHistory'] = fromSerializer.data
             data['toHistory'] = toSerializer.data
             return Response(data)
-        return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    def put(self, request, accountId):
-        account = Account.getObject(accountId)
-        if account is not None:
-            serializer = AccountSerializer(account, data=request.data)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
 
     def delete(self, request, accountId):
