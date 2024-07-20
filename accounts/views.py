@@ -77,6 +77,8 @@ class TransferFundsView(APIView):
             fromAccountId = serializer.validated_data['fromAccountId']
             toAccountId = serializer.validated_data['toAccountId']
             amount = serializer.validated_data['amount']
+            if fromAccountId == toAccountId:
+                return Response({"error": "From account and to account cannot be the same"}, status=status.HTTP_400_BAD_REQUEST)
 
             fromAccount = Account.getObject(fromAccountId)
             toAccount = Account.getObject(toAccountId)
@@ -94,10 +96,13 @@ class TransferFundsView(APIView):
                 else:
                     return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": 'validation data error', 'data':serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ImportAccountsView(APIView):
+    def __init__(self):
+        self.duplicateId = None
+        
     def post(self, request):
         file = request.FILES.get('file')
         if not file:
@@ -107,31 +112,45 @@ class ImportAccountsView(APIView):
 
         fileName, fileExtension = os.path.splitext(file.name)
         fileExtension = fileExtension.lower()
-        print(fileExtension)
         if fileExtension in ['', '.csv', '.txt']:
             reader = csv.reader(io.StringIO(file.read().decode('utf-8')))
             next(reader)
             for row in reader:
                 ID, Name, Balance = row
-                Account.objects.create(accountId=ID, name=Name, balance=Balance)
+                try:
+                    existingAccount = Account.objects.get(accountId=ID)
+                    return Response({'error': f'Account with ID {ID} already exists'}, status=400)
+                except Account.DoesNotExist:
+                    Account.objects.create(accountId=ID, name=Name, balance=Balance)
         elif fileExtension in ['.xls', '.xlsx']:
             try:
                 df = pd.read_excel(file, engine="openpyxl")
             except Exception as e:
                 return Response({'error': str(e)}, status=400)
-            self._process_dataframe(df)
+            if not self.processDataframe(df):
+                return Response({'error': f'Account with ID {ID} already exists'}, status=400)
         elif fileExtension == '.ods':
             try:
                 df = pd.read_excel(file, engine="odf")
             except Exception as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            self._process_dataframe(df)
+            if not self.processDataframe(df):
+                return Response({'error': f'Account with ID {self.getDuplicateId()} already exists'}, status=400)
         else:
             return Response({'error': 'File type not supported'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'message': 'Accounts imported successfully'})
 
-    def _process_dataframe(self, df):
+    def processDataframe(self, df):
         for index, row in df.iterrows():
             ID, Name, Balance = row
-            Account.objects.create(accountId=ID, name=Name, balance=Balance)
+            try:
+                existingAccount = Account.objects.get(accountId=ID)
+                self.duplicateId = ID
+                return False
+            except Account.DoesNotExist:
+                Account.objects.create(accountId=ID, name=Name, balance=Balance)
+                return True
+                
+    def getDuplicateId(self):
+        return self.duplicateId
