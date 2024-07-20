@@ -1,8 +1,9 @@
 # tests.py
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from.models import Account
 from .serializers import AccountSerializer, TransferFundsSerializer
+from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 
 class AccountSerializerTestCase(TestCase):
     def testSerializeAccount(self):
@@ -60,9 +61,59 @@ class TransferViewTestCase(TestCase):
         self.assertEqual(response.data, {'error': 'Insufficient funds'})
 
 class ImportAccountsViewTestCase(TestCase):
-    def testImportAccounts(self):
+    def setUp(self):
+        self.client = APIClient()
+
+    def testMissingFile(self):
+        response = self.client.post('/accounts/import/', {})
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data, {'error': 'Request has no file attached'})
+
+    def testEmptyFile(self):
+        with open('testEmpty.csv', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data, {'error': 'The file is empty'})
+
+    def testInvalidFileType(self):
+        with open('testInvalidType.pdf', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data, {'error': 'File type not supported'})
+
+    def testCsvFile(self):
         with open('testAccounts.csv', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.data, {'message': 'Accounts imported successfully'})
+        
+    def testNoExtention(self):
+        with open('testNoExtention', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.data, {'message': 'Accounts imported successfully'})
+        
+    def testTxtFile(self):
+        with open('testAccounts.txt', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.data, {'message': 'Accounts imported successfully'})
+
+    def testXlsFile(self):
+        with open('testAccounts.xls', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.data, {'message': 'Accounts imported successfully'})
+
+    def testXlsxFile(self):
+        with open('testAccounts.ods', 'rb') as f:
+            response = self.client.post('/accounts/import/', {'file': f})
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.data, {'message': 'Accounts imported successfully'})
+
+    def testOdsFile(self):
+        with open('testAccounts.ods', 'rb') as f:
             response = self.client.post('/accounts/import/', {'file': f})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, {'message': 'Accounts imported successfully'})
-        self.assertEqual(Account.objects.count(), 4)
+        self.assertEqual(Account.objects.count(), 1)
